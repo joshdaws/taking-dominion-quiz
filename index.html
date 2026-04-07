@@ -281,6 +281,47 @@
       color: var(--gold) !important;
     }
 
+    .crowd-stat {
+      font-size: 0.8125rem;
+      color: var(--text-dim);
+      margin-bottom: 12px;
+      opacity: 0.8;
+    }
+
+    /* ── Results breakdown ── */
+    .results-breakdown {
+      max-width: 520px;
+      margin: 0 auto 40px;
+      text-align: left;
+    }
+    .results-breakdown h3 {
+      font-family: var(--font-serif);
+      font-size: 1.125rem;
+      font-weight: 400;
+      color: var(--white);
+      margin-bottom: 16px;
+    }
+    .breakdown-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .breakdown-row:last-child { border-bottom: none; }
+    .breakdown-source {
+      font-size: 0.8125rem;
+      color: var(--text);
+      flex: 1;
+    }
+    .breakdown-pct {
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--text-dim);
+      text-align: right;
+      min-width: 80px;
+    }
+
     /* ── Results screen ── */
     .results {
       justify-content: center;
@@ -445,6 +486,8 @@
       <p class="score-label" id="scoreLabel"></p>
       <p class="results-commentary" id="resultsCommentary"></p>
 
+      <div class="results-breakdown" id="resultsBreakdown"></div>
+
       <div class="results-insight">
         <h3>What this means</h3>
         <p>
@@ -482,7 +525,45 @@
     </div>
   </div>
 
-  <script>
+  <script type="module">
+    // ═══════════════════════════════════════════════════
+    // CONVEX CLIENT
+    // ═══════════════════════════════════════════════════
+    import { ConvexHttpClient } from 'https://esm.sh/convex@1.21.0/browser';
+
+    var CONVEX_URL = 'https://exuberant-marten-469.convex.cloud';
+    var convex = new ConvexHttpClient(CONVEX_URL);
+    var crowdStats = {};
+
+    async function loadStats() {
+      try {
+        crowdStats = await convex.query('stats:getAll', {});
+      } catch (e) {
+        // Stats are non-critical; quiz works without them
+      }
+    }
+
+    async function recordAnswer(questionIndex, correct) {
+      try {
+        await convex.mutation('stats:recordAnswer', { questionIndex: questionIndex, correct: correct });
+        // Update local cache
+        if (!crowdStats[questionIndex]) crowdStats[questionIndex] = { total: 0, correct: 0 };
+        crowdStats[questionIndex].total++;
+        if (correct) crowdStats[questionIndex].correct++;
+      } catch (e) {
+        // Non-critical
+      }
+    }
+
+    function getCrowdPct(questionIndex) {
+      var s = crowdStats[questionIndex];
+      if (!s || s.total < 2) return null;
+      return Math.round((s.correct / s.total) * 100);
+    }
+
+    // Load stats on page load
+    loadStats();
+
     // ═══════════════════════════════════════════════════
     // QUIZ DATA
     // Each question has an "original" and a "rewritten" passage.
@@ -662,6 +743,9 @@
         document.getElementById('badge' + originalSide).textContent = 'Original';
       }
 
+      // Record to Convex
+      recordAnswer(currentQuestion, isCorrect);
+
       // Build feedback
       var feedbackEl = document.getElementById('feedback');
       clearEl(feedbackEl);
@@ -670,6 +754,16 @@
         className: 'feedback-text fade-in ' + (isCorrect ? 'correct-text' : 'incorrect-text'),
         textContent: isCorrect ? 'Correct.' : 'Not quite.'
       });
+
+      // Crowd stat
+      var crowdPct = getCrowdPct(currentQuestion);
+      var crowdEl = null;
+      if (crowdPct !== null) {
+        crowdEl = el('p', {
+          className: 'crowd-stat fade-in',
+          textContent: crowdPct + '% of people got this one right'
+        });
+      }
 
       var sourceText = el('a', {
         className: 'source-reveal fade-in',
@@ -688,6 +782,7 @@
       });
 
       feedbackEl.appendChild(resultText);
+      if (crowdEl) feedbackEl.appendChild(crowdEl);
       feedbackEl.appendChild(sourceText);
       feedbackEl.appendChild(nextBtn);
     }
@@ -697,7 +792,7 @@
       renderQuestion();
     }
 
-    function showResults() {
+    async function showResults() {
       showScreen('resultsScreen');
       var total = questions.length;
       document.getElementById('scoreDisplay').textContent = score;
@@ -710,6 +805,32 @@
       var shareUrl = window.location.href;
       document.getElementById('shareTwitter').href =
         'https://x.com/intent/tweet?text=' + encodeURIComponent(shareText) + '&url=' + encodeURIComponent(shareUrl);
+
+      // Refresh stats and build breakdown
+      await loadStats();
+      var breakdownEl = document.getElementById('resultsBreakdown');
+      clearEl(breakdownEl);
+
+      var hasAnyStats = false;
+      for (var i = 0; i < questions.length; i++) {
+        if (crowdStats[i] && crowdStats[i].total >= 2) { hasAnyStats = true; break; }
+      }
+
+      if (hasAnyStats) {
+        breakdownEl.appendChild(el('h3', { textContent: 'How everyone did' }));
+        for (var i = 0; i < questions.length; i++) {
+          var pct = getCrowdPct(i);
+          var src = questions[i].source.split(',')[0];
+          var row = el('div', { className: 'breakdown-row' }, [
+            el('span', { className: 'breakdown-source', textContent: src }),
+            el('span', {
+              className: 'breakdown-pct',
+              textContent: pct !== null ? pct + '% correct' : 'Not enough data'
+            })
+          ]);
+          breakdownEl.appendChild(row);
+        }
+      }
     }
 
     function getCommentary(s, total) {
