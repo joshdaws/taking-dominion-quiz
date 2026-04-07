@@ -8,8 +8,18 @@
 
   <!-- Open Graph -->
   <meta property="og:title" content="Can You Spot the AI?" />
-  <meta property="og:description" content="Ten passages. One original, one rewritten by AI. Same meaning, different words. Think you can tell the difference?" />
+  <meta property="og:description" content="One passage is the original. The other was rewritten by AI. Same meaning, different words. Think you can tell?" />
   <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://quiz.takingdominionwithai.com/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:url" content="https://quiz.takingdominionwithai.com" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Can You Spot the AI?" />
+  <meta name="twitter:description" content="One passage is the original. The other was rewritten by AI. Same meaning, different words. Think you can tell?" />
+  <meta name="twitter:image" content="https://quiz.takingdominionwithai.com/og-image.png" />
 
   <!-- Fonts: match Taking Dominion main site -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -853,7 +863,7 @@
       document.getElementById('progressBar').style.width = '100%';
 
       // Share link
-      var shareText = 'I got ' + score + '/' + total + ' on "Can You Spot the AI?" \u2014 a quiz about whether you can tell AI-rewritten passages from originals. Think you can do better?';
+      var shareText = 'I got ' + score + '/' + total + ' on "Can You Spot the AI?", a quiz about whether you can tell AI-rewritten passages from originals. Think you can do better?';
       var shareUrl = window.location.href;
       document.getElementById('shareTwitter').href =
         'https://x.com/intent/tweet?text=' + encodeURIComponent(shareText) + '&url=' + encodeURIComponent(shareUrl);
@@ -925,7 +935,7 @@
     }
 
     function copyResults() {
-      var text = 'I got ' + score + '/' + questions.length + ' on "Can You Spot the AI?" \u2014 ' + window.location.href;
+      var text = 'I got ' + score + '/' + questions.length + ' on "Can You Spot the AI?" ' + window.location.href;
       navigator.clipboard.writeText(text).then(function() {
         var btn = document.getElementById('copyBtn');
         var origText = btn.textContent;
