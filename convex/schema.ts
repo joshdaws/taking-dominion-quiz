@@ -7,4 +7,9 @@ export default defineSchema({
     totalAttempts: v.number(),
     correctCount: v.number(),
   }).index("by_question", ["questionIndex"]),
+  quizScores: defineTable({
+    score: v.number(),
+    totalQuestions: v.number(),
+    completedAt: v.number(),
+  }),
 });

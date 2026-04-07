@@ -41,3 +41,35 @@ export const getAll = query({
     return byQuestion;
   },
 });
+
+export const recordScore = mutation({
+  args: {
+    score: v.number(),
+    totalQuestions: v.number(),
+  },
+  handler: async (ctx, { score, totalQuestions }) => {
+    await ctx.db.insert("quizScores", {
+      score,
+      totalQuestions,
+      completedAt: Date.now(),
+    });
+  },
+});
+
+export const getScoreDistribution = query({
+  args: { totalQuestions: v.number() },
+  handler: async (ctx, { totalQuestions }) => {
+    const scores = await ctx.db.query("quizScores").collect();
+    const distribution: Record<number, number> = {};
+    for (let i = 0; i <= totalQuestions; i++) distribution[i] = 0;
+    for (const s of scores) {
+      if (s.totalQuestions === totalQuestions) {
+        distribution[s.score] = (distribution[s.score] || 0) + 1;
+      }
+    }
+    const totalResponses = scores.filter(
+      (s) => s.totalQuestions === totalQuestions
+    ).length;
+    return { distribution, totalResponses };
+  },
+});
