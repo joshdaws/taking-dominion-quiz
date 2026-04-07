@@ -2,7 +2,7 @@ import { mutation, query, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 
 const WINDOW_MS = 60 * 1000; // 1 minute
-const MAX_PER_WINDOW = 30; // max 30 mutations per minute (generous for normal use)
+const MAX_PER_WINDOW = 5; // max 5 submissions per minute
 
 async function checkRateLimit(ctx: MutationCtx, key: string): Promise<boolean> {
   const now = Date.now();
@@ -29,33 +29,51 @@ async function checkRateLimit(ctx: MutationCtx, key: string): Promise<boolean> {
   return true;
 }
 
-export const recordAnswer = mutation({
+export const submitQuiz = mutation({
   args: {
-    questionIndex: v.number(),
-    correct: v.boolean(),
+    answers: v.array(
+      v.object({
+        questionIndex: v.number(),
+        correct: v.boolean(),
+      })
+    ),
+    score: v.number(),
+    totalQuestions: v.number(),
     fingerprint: v.optional(v.string()),
   },
-  handler: async (ctx, { questionIndex, correct, fingerprint }) => {
-    const key = "answer:" + (fingerprint || "global");
+  handler: async (ctx, { answers, score, totalQuestions, fingerprint }) => {
+    const key = "submit:" + (fingerprint || "global");
     if (!(await checkRateLimit(ctx, key))) return;
 
-    const existing = await ctx.db
-      .query("quizStats")
-      .withIndex("by_question", (q) => q.eq("questionIndex", questionIndex))
-      .unique();
+    // Update per-question stats
+    for (const answer of answers) {
+      const existing = await ctx.db
+        .query("quizStats")
+        .withIndex("by_question", (q) =>
+          q.eq("questionIndex", answer.questionIndex)
+        )
+        .unique();
 
-    if (existing) {
-      await ctx.db.patch(existing._id, {
-        totalAttempts: existing.totalAttempts + 1,
-        correctCount: existing.correctCount + (correct ? 1 : 0),
-      });
-    } else {
-      await ctx.db.insert("quizStats", {
-        questionIndex,
-        totalAttempts: 1,
-        correctCount: correct ? 1 : 0,
-      });
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          totalAttempts: existing.totalAttempts + 1,
+          correctCount: existing.correctCount + (answer.correct ? 1 : 0),
+        });
+      } else {
+        await ctx.db.insert("quizStats", {
+          questionIndex: answer.questionIndex,
+          totalAttempts: 1,
+          correctCount: answer.correct ? 1 : 0,
+        });
+      }
     }
+
+    // Record final score
+    await ctx.db.insert("quizScores", {
+      score,
+      totalQuestions,
+      completedAt: Date.now(),
+    });
   },
 });
 
@@ -71,24 +89,6 @@ export const getAll = query({
       };
     }
     return byQuestion;
-  },
-});
-
-export const recordScore = mutation({
-  args: {
-    score: v.number(),
-    totalQuestions: v.number(),
-    fingerprint: v.optional(v.string()),
-  },
-  handler: async (ctx, { score, totalQuestions, fingerprint }) => {
-    const key = "score:" + (fingerprint || "global");
-    if (!(await checkRateLimit(ctx, key))) return;
-
-    await ctx.db.insert("quizScores", {
-      score,
-      totalQuestions,
-      completedAt: Date.now(),
-    });
   },
 });
 

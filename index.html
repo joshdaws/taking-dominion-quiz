@@ -596,13 +596,14 @@
       }
     }
 
-    async function recordAnswer(questionIndex, correct) {
+    async function submitQuiz(answersData, finalScore, totalQuestions) {
       try {
-        await convex.mutation('stats:recordAnswer', { questionIndex: questionIndex, correct: correct, fingerprint: fingerprint });
-        // Update local cache
-        if (!crowdStats[questionIndex]) crowdStats[questionIndex] = { total: 0, correct: 0 };
-        crowdStats[questionIndex].total++;
-        if (correct) crowdStats[questionIndex].correct++;
+        await convex.mutation('stats:submitQuiz', {
+          answers: answersData,
+          score: finalScore,
+          totalQuestions: totalQuestions,
+          fingerprint: fingerprint
+        });
       } catch (e) {
         // Non-critical
       }
@@ -805,9 +806,6 @@
         document.getElementById('badge' + originalSide).textContent = 'Original';
       }
 
-      // Record to Convex
-      recordAnswer(currentQuestion, isCorrect);
-
       // Build feedback
       var feedbackEl = document.getElementById('feedback');
       clearEl(feedbackEl);
@@ -868,10 +866,11 @@
       document.getElementById('shareTwitter').href =
         'https://x.com/intent/tweet?text=' + encodeURIComponent(shareText) + '&url=' + encodeURIComponent(shareUrl);
 
-      // Record score to Convex
-      try {
-        await convex.mutation('stats:recordScore', { score: score, totalQuestions: total, fingerprint: fingerprint });
-      } catch (e) {}
+      // Submit all answers + score in one mutation
+      var answersData = answers.map(function(a) {
+        return { questionIndex: a.question, correct: a.isCorrect };
+      });
+      submitQuiz(answersData, score, total);
 
       // Fetch score distribution and build bar graph
       var breakdownEl = document.getElementById('resultsBreakdown');
