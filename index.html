@@ -569,7 +569,7 @@
 
     async function recordAnswer(questionIndex, correct) {
       try {
-        await convex.mutation('stats:recordAnswer', { questionIndex: questionIndex, correct: correct });
+        await convex.mutation('stats:recordAnswer', { questionIndex: questionIndex, correct: correct, fingerprint: fingerprint });
         // Update local cache
         if (!crowdStats[questionIndex]) crowdStats[questionIndex] = { total: 0, correct: 0 };
         crowdStats[questionIndex].total++;
@@ -581,9 +581,18 @@
 
     function getCrowdPct(questionIndex) {
       var s = crowdStats[questionIndex];
-      if (!s || s.total < 2) return null;
+      if (!s || s.total < 1) return null;
       return Math.round((s.correct / s.total) * 100);
     }
+
+    // Simple fingerprint for rate limiting (not tracking, just abuse prevention)
+    var fingerprint = (function() {
+      var stored = sessionStorage.getItem('qfp');
+      if (stored) return stored;
+      var fp = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      sessionStorage.setItem('qfp', fp);
+      return fp;
+    })();
 
     // Load stats on page load
     loadStats();
@@ -832,7 +841,7 @@
 
       // Record score to Convex
       try {
-        await convex.mutation('stats:recordScore', { score: score, totalQuestions: total });
+        await convex.mutation('stats:recordScore', { score: score, totalQuestions: total, fingerprint: fingerprint });
       } catch (e) {}
 
       // Fetch score distribution and build bar graph
@@ -841,7 +850,7 @@
 
       try {
         var distData = await convex.query('stats:getScoreDistribution', { totalQuestions: total });
-        if (distData.totalResponses >= 3) {
+        if (distData.totalResponses >= 1) {
           var dist = distData.distribution;
           var maxCount = 0;
           for (var i = 0; i <= total; i++) {

@@ -12,4 +12,9 @@ export default defineSchema({
     totalQuestions: v.number(),
     completedAt: v.number(),
   }),
+  rateLimits: defineTable({
+    key: v.string(),
+    count: v.number(),
+    windowStart: v.number(),
+  }).index("by_key", ["key"]),
 });
